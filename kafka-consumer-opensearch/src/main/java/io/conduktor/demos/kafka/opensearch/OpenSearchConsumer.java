@@ -1,6 +1,11 @@
-package opensearch;
+package io.conduktor.demos.kafka.opensearch;
 
-import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.net.URI;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Properties;
+
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -12,7 +17,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.opensearch.action.bulk.BulkRequest;
@@ -27,11 +31,7 @@ import org.opensearch.common.xcontent.XContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.URI;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Properties;
+import com.google.gson.JsonParser;
 
 public class OpenSearchConsumer {
 
@@ -62,13 +62,12 @@ public class OpenSearchConsumer {
                                     httpAsyncClientBuilder -> httpAsyncClientBuilder.setDefaultCredentialsProvider(cp)
                                             .setKeepAliveStrategy(new DefaultConnectionKeepAliveStrategy())));
 
-
         }
 
         return restHighLevelClient;
     }
 
-    private static KafkaConsumer<String, String> createKafkaConsumer(){
+    private static KafkaConsumer<String, String> createKafkaConsumer() {
 
         String groupId = "consumer-opensearch-demo";
 
@@ -86,7 +85,7 @@ public class OpenSearchConsumer {
 
     }
 
-    private static String extractId(String json){
+    private static String extractId(String json) {
         // gson library
         return JsonParser.parseString(json)
                 .getAsJsonObject()
@@ -126,11 +125,11 @@ public class OpenSearchConsumer {
 
         // we need to create the index on OpenSearch if it doesn't exist already
 
-        try(openSearchClient; consumer){
+        try (openSearchClient; consumer) {
 
             boolean indexExists = openSearchClient.indices().exists(new GetIndexRequest("wikimedia"), RequestOptions.DEFAULT);
 
-            if (!indexExists){
+            if (!indexExists) {
                 CreateIndexRequest createIndexRequest = new CreateIndexRequest("wikimedia");
                 openSearchClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
                 log.info("The Wikimedia Index has been created!");
@@ -141,8 +140,7 @@ public class OpenSearchConsumer {
             // we subscribe the consumer
             consumer.subscribe(Collections.singleton("wikimedia.recentchange"));
 
-
-            while(true) {
+            while (true) {
 
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(3000));
 
@@ -157,7 +155,7 @@ public class OpenSearchConsumer {
 
                     // strategy 1
                     // define an ID using Kafka Record coordinates
-//                    String id = record.topic() + "_" + record.partition() + "_" + record.offset();
+                    // String id = record.topic() + "_" + record.partition() + "_" + record.offset();
 
                     try {
                         // strategy 2
@@ -168,19 +166,18 @@ public class OpenSearchConsumer {
                                 .source(record.value(), XContentType.JSON)
                                 .id(id);
 
-//                        IndexResponse response = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
+                        // IndexResponse response = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
 
                         bulkRequest.add(indexRequest);
 
-//                        log.info(response.getId());
-                    } catch (Exception e){
+                        // log.info(response.getId());
+                    } catch (Exception e) {
 
                     }
 
                 }
 
-
-                if (bulkRequest.numberOfActions() > 0){
+                if (bulkRequest.numberOfActions() > 0) {
                     BulkResponse bulkResponse = openSearchClient.bulk(bulkRequest, RequestOptions.DEFAULT);
                     log.info("Inserted " + bulkResponse.getItems().length + " record(s).");
 
@@ -195,11 +192,7 @@ public class OpenSearchConsumer {
                     log.info("Offsets have been committed!");
                 }
 
-
-
-
             }
-
 
         } catch (WakeupException e) {
             log.info("Consumer is starting to shut down");
